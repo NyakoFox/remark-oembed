@@ -1,17 +1,25 @@
-const oembed = require('../');
+import oembed from '../index.js';
 
-const test = require('ava');
-const { transform } = require('@babel/core');
-const { join } = require('path');
-const puppeteer = require('puppeteer');
-const mdx = require('@mdx-js/mdx');
-const { readFile, writeFile } = require('mz/fs');
-const prettier = require('prettier');
-const virtual = require('@rollup/plugin-virtual');
-const rollup = require('rollup');
-const React = require('react');
-const ReactDOM = require('react-dom/server');
-const remark = require('remark');
+import test from 'ava';
+import { transform } from '@babel/core';
+import { join } from 'path';
+import puppeteer from 'puppeteer';
+import { compile as mdxCompile } from '@mdx-js/mdx';
+import { readFile, writeFile } from 'fs/promises';
+import prettier from 'prettier';
+import virtual from '@rollup/plugin-virtual';
+import { rollup } from 'rollup';
+import React from 'react';
+import ReactDOM from 'react-dom';
+import remark from 'remark';
+import remarkHtml from 'remark-html';
+import { babel } from '@rollup/plugin-babel';
+
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const { CI = 'false' } = process.env;
 const FIXTURES = join(__dirname, 'fixtures');
@@ -24,7 +32,7 @@ const compileJsx = async (src, options) => {
     return prettier.format(str, { ...config, parser: 'html' });
   };
 
-  const jsx = await mdx(src, {
+  const jsx = await mdxCompile(src, {
     commonmark: true,
     gfm: true,
     remarkPlugins: [[oembed, options]],
@@ -32,7 +40,7 @@ const compileJsx = async (src, options) => {
 
   const { code } = transform(jsx.replace(/^\/\*\s*?@jsx\s*?mdx\s\*\//, ''), {
     sourceType: 'module',
-    presets: [require.resolve('@babel/preset-react')],
+    presets: ['@babel/preset-react'],
   });
 
   const bundle = await rollup.rollup({
@@ -44,9 +52,9 @@ const compileJsx = async (src, options) => {
           .concat(`const mdx = React.createElement;\n`)
           .concat(code),
       }),
-      require('rollup-plugin-babel')({
+      babel({
         sourceType: 'module',
-        presets: [require.resolve('@babel/preset-react')],
+        presets: ['@babel/preset-react'],
       }),
     ],
   });
@@ -81,7 +89,7 @@ const compile = async (src, options) => {
   return new Promise((resolve, reject) => {
     return remark()
       .use(oembed, options)
-      .use(require('remark-html'))
+      .use(remarkHtml)
       .process(src, handleResult(resolve, reject));
   });
 };

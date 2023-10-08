@@ -1,11 +1,11 @@
-const Got = require('got');
-const h = require('hastscript');
-const Intercept = require('apr-intercept');
-const { getType } = require('mime');
-const { paramCase: ParamCase } = require('param-case');
-const toHtml = require('hast-util-to-html');
-const { format, parse } = require('url');
-const IsUrl = require('is-url');
+import ky from 'ky';
+import { h } from 'hastscript';
+import ctch from 'apr-intercept';
+import mime from 'mime';
+import { paramCase as ParamCase } from 'param-case';
+import toHtml from 'hast-util-to-html';
+import { format, parse } from 'url';
+import IsUrl from 'is-url';
 
 const OEMBED_PROVIDERS_URL = 'https://oembed.com/providers.json';
 const EMPTY_CANVAS =
@@ -103,7 +103,7 @@ const Anchor = (props, children = []) => {
 
 const StaticPhotoOembed = ({ emptyUrl, url, href, jsx = false, ...rest }) => {
   const src = emptyUrl || url;
-  const isImage = /^image\//.test(getType(href) || '');
+  const isImage = /^image\//.test(mime.getType(href) || '');
 
   const img = Img({ ...rest, url: src, dataSrc: url });
   const anchor = isImage ? img : Anchor({ href }, [img]);
@@ -172,7 +172,7 @@ const transformImage = async (ctx = {}) => {
     return {};
   }
 
-  const isImage = /^image\//.test(getType(parse(url).pathname) || '');
+  const isImage = /^image\//.test(mime.getType(parse(url).pathname) || '');
   if (!isImage) {
     return {};
   }
@@ -188,7 +188,7 @@ const transformImage = async (ctx = {}) => {
 
 const processOembed = async (oembed) => {
   const { source, url, syncWidget = false, jsx = false } = oembed;
-  const isImage = /^image\//.test(getType(url) || '');
+  const isImage = /^image\//.test(mime.getType(url) || '');
 
   if (!isImage && !source) {
     return;
@@ -233,10 +233,11 @@ const fetchOembed = async (endpoint) => {
     }),
   );
 
-  return Got(href, {
+  /*return Got(href, {
     responseType: 'json',
     resolveBodyOnly: true,
-  });
+  }); */
+  return ky.get(href).json();
 };
 
 const getProviderEndpoint = (linkUrl, providers = []) => {
@@ -278,10 +279,11 @@ const processNode = async (node, { providers = [], ...options }) => {
 };
 
 const fetchOembedProviders = async () => {
-  return Got(OEMBED_PROVIDERS_URL, {
+  /*return Got(OEMBED_PROVIDERS_URL, {
     responseType: 'json',
     resolveBodyOnly: true,
-  });
+  });*/
+  return ky.get(OEMBED_PROVIDERS_URL).json();
 };
 
 // https://github.com/syntax-tree/unist-util-map/blob/bb0567f651517b2d521af711d7376475b3d8446a/index.js
@@ -291,7 +293,7 @@ const map = async (tree, iteratee) => {
   };
 
   const preorder = async (node, index, parent) => {
-    const [, newNode = {}] = await Intercept(iteratee(node, index, parent));
+    const [, newNode = {}] = await ctch(iteratee(node, index, parent));
     const { children = [] } = newNode || node;
 
     return {
@@ -304,7 +306,7 @@ const map = async (tree, iteratee) => {
   return preorder(tree, null, null);
 };
 
-module.exports = (opts = {}) => {
+export default function oembed(opts = {}) {
   const { jsx = false } = opts;
 
   return async (tree) => {
@@ -381,4 +383,4 @@ module.exports = (opts = {}) => {
       ]),
     });
   };
-};
+}
